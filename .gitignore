@@ -32,3 +32,6 @@ signing.properties
 
 # Release artifacts are distributed out-of-band
 dist/
+
+# Stray Python packages
+*.whl
