@@ -2,7 +2,7 @@ spring:
   application:
     name: family-safety-backend
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/familysafety}
+    url: ${DATABASE_URL:jdbc:postgresql://${DATABASE_HOST:localhost}:${DATABASE_PORT:5432}/${DATABASE_NAME:familysafety}}
     username: ${DATABASE_USERNAME:familysafety}
     password: ${DATABASE_PASSWORD:}
     hikari:

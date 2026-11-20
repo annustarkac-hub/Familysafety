@@ -17,7 +17,7 @@ sealed interface HealthResult {
 /** "Test connection": checks that a Family Safety backend answers its health endpoint at [url]. */
 class ServerHealthChecker(base: OkHttpClient, private val io: CoroutineDispatcher) {
     private val client = base.newBuilder()
-        .connectTimeout(8, TimeUnit.SECONDS).readTimeout(8, TimeUnit.SECONDS).callTimeout(12, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS).readTimeout(75, TimeUnit.SECONDS).callTimeout(90, TimeUnit.SECONDS)
         .build()
 
     suspend fun check(url: HttpUrl): HealthResult = withContext(io) {

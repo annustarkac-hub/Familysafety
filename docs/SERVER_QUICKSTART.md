@@ -7,6 +7,11 @@ If the app says *"Can't find the server"* or shows **Connect to your server firs
 Tap **Server** (top-right of the sign-in screen), enter your server's address, and tap **Save**. The app tests the
 connection before saving.
 
+## Easiest — free server on Render (no computer needed)
+
+Follow **[FREE_SERVER_RENDER.md](FREE_SERVER_RENDER.md)**: sign up with GitHub, create a Blueprint from this repository,
+wait for it to go Live, then enter the `https://…onrender.com` address in the app.
+
 ## Option A — try it from your computer (≈10 minutes)
 
 Requirements: a computer with Docker, Java 21 and this repository.

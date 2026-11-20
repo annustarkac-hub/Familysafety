@@ -24,7 +24,23 @@ Generated 2026-11-20.
 | Dependency verification (`gradle/verification-metadata.xml`, SHA-256) | Active in both builds; all builds above passed verification |
 | `docker compose up` + `scripts/e2e-smoke.py` | PASS |
 
-## Release artifacts — 1.1.0 (current)
+## Release artifacts — 1.1.1 (current)
+
+Same signing certificate; versionCode 3. Verified with apksigner. Built after regenerating dependency verification
+from an empty Gradle cache; 142/142 Android tests and lint (0 correctness warnings) passed in that fresh-cache run.
+
+| File | Size (bytes) | SHA-256 |
+|---|---|---|
+| FamilySafety-1.1.1-arm64-v8a-release.apk | 13,631,233 | `22b47799eb6e26168122fa8740a351718fbe6ef271c84a625f9c11e240a31886` |
+| FamilySafety-1.1.1-armeabi-v7a-release.apk | 8,664,215 | `2f28410e3df884ae9b4de68fd80d79fde707f47a419fe4de1dcb2955f3a46b5a` |
+| FamilySafety-1.1.1-universal-release.apk | 45,499,800 | `77fbc649af6f2715544e0a8ae20c8ce100b9ebdf725c1089af0ace9b2cde53de` |
+| FamilySafety-1.1.1-x86-release.apk | 14,427,247 | `6fd1a4e2ebf27e34a84a90cf1ba6896661732e8c6deab50ba2c7cf2e2a5f3052` |
+| FamilySafety-1.1.1-x86_64-release.apk | 14,910,080 | `2cf387505bbd9449a1ab6211678a98bbd0cbea3ccf9bdd8b75c256385821ca7b` |
+
+Server image (`backend/Dockerfile`): built from an empty cache, run with the Render blueprint's settings under a
+512 MB limit (~296 MB used); `e2e-smoke.py --forwarded-https` 10/10 PASS; plain HTTP → 403. Backend tests 46/46.
+
+## Release artifacts — 1.1.0 (superseded)
 
 Built with `scripts/build-apk.sh`, every APK verified with `apksigner` (v2+v3), same signing certificate as 1.0.0
 (SHA-256 `8a881ecc…db59ac`), so 1.1.0 installs over 1.0.0 as an update. versionCode 2, versionName 1.1.0.

@@ -178,7 +178,7 @@ fun ServerSettingsContent(
                 when (check) {
                     ConnectionCheck.Idle -> Unit
                     ConnectionCheck.Checking -> {
-                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)); Text("Contacting server…")
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)); Text("Contacting server… (a sleeping free server can take up to a minute)")
                     }
                     ConnectionCheck.Ok -> {
                         Icon(Icons.Outlined.CheckCircle, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(8.dp))

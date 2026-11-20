@@ -16,8 +16,8 @@ val signingProps = Properties().apply {
 }
 fun signingValue(env: String, prop: String): String? = System.getenv(env) ?: signingProps.getProperty(prop)
 
-val appVersionCode = providers.gradleProperty("familysafety.versionCode").getOrElse("2").toInt()
-val appVersionName = providers.gradleProperty("familysafety.versionName").getOrElse("1.1.0")
+val appVersionCode = providers.gradleProperty("familysafety.versionCode").getOrElse("3").toInt()
+val appVersionName = providers.gradleProperty("familysafety.versionName").getOrElse("1.1.1")
 
 android {
     namespace = "com.familysafety.app"

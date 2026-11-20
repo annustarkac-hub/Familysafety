@@ -98,7 +98,7 @@ object DataModule {
     fun baseClient(server: ServerConfigStore): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(BaseUrlInterceptor(server.defaultUrl) { server.current })
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(75, TimeUnit.SECONDS) // free hosting tiers can take ~1 min to wake up
         .pingInterval(25, TimeUnit.SECONDS)
         .apply {
             if (BuildConfig.DEBUG) {

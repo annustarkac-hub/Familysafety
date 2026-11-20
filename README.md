@@ -47,7 +47,8 @@ docker-compose.yml    PostgreSQL, backend, Caddy (TLS), optional coturn
 
 The app needs a Family Safety server reachable over HTTPS. On the sign-in screen tap **Server**, enter the address and
 **Save** (the connection is tested first). The fastest way to get one is in **[docs/SERVER_QUICKSTART.md](docs/SERVER_QUICKSTART.md)**
-(Docker + an HTTPS tunnel, about 10 minutes).
+(Docker + an HTTPS tunnel, about 10 minutes), or create a **free hosted server on Render** without a computer:
+[docs/FREE_SERVER_RENDER.md](docs/FREE_SERVER_RENDER.md).
 
 ## Quick start (local development)
 

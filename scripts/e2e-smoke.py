@@ -17,7 +17,10 @@ import urllib.request
 import uuid
 from datetime import date, timezone, datetime
 
-BASE = (sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8080").rstrip("/")
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+# --forwarded-https: act like a TLS-terminating proxy (adds X-Forwarded-Proto: https) when calling the backend directly.
+FORWARDED_HTTPS = "--forwarded-https" in sys.argv
+BASE = (ARGS[0] if ARGS else "http://127.0.0.1:8080").rstrip("/")
 PASSWORD = "smoke test password " + uuid.uuid4().hex[:8]
 
 
@@ -26,6 +29,8 @@ def call(method, path, body=None, token=None, expect=None):
     req = urllib.request.Request(BASE + path, data=data, method=method, headers={"Content-Type": "application/json"})
     if token:
         req.add_header("Authorization", "Bearer " + token)
+    if FORWARDED_HTTPS:
+        req.add_header("X-Forwarded-Proto", "https")
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
             status, raw = r.status, r.read()

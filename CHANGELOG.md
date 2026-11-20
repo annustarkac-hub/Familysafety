@@ -5,6 +5,21 @@ versioning: [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-11-20
+
+### Added
+- One-click free hosting: `render.yaml` blueprint (API + PostgreSQL + HTTPS) and `docs/FREE_SERVER_RENDER.md`.
+- Self-contained `backend/Dockerfile` (builds the jar inside Docker) for hosting platforms.
+- Database settings may be given as host/port/name parts (`DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`).
+- `scripts/e2e-smoke.py --forwarded-https` to test servers that require HTTPS behind a proxy.
+
+### Changed
+- App waits up to 75 s for the server (free hosting tiers sleep and take ~1 min to wake); the connection test says so.
+
+### Fixed
+- Dependency verification metadata was incomplete for a fresh Gradle cache (BOM files fetched during plugin
+  resolution), which would fail builds on CI/hosting/new machines. Regenerated for both builds from an empty cache.
+
 ## [1.1.0] — 2026-11-20
 
 ### Added
