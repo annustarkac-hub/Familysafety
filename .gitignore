@@ -1,0 +1,34 @@
+# Build outputs
+**/build/
+**/.gradle/
+**/out/
+*.class
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Android
+local.properties
+*.apk
+*.aab
+*.ap_
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Secrets — never commit
+.env
+*.env.local
+*.jks
+*.keystore
+*.p12
+keystore.properties
+signing.properties
+**/secrets/
+
+# Release artifacts are distributed out-of-band
+dist/

@@ -1,0 +1,7 @@
+# Local development profile: plain HTTP on localhost/emulator only. Never use in production.
+familysafety:
+  security:
+    require-https: false
+logging:
+  level:
+    com.familysafety: DEBUG
