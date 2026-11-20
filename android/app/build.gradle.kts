@@ -67,7 +67,13 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
-    testOptions { unitTests.isIncludeAndroidResources = true; unitTests.isReturnDefaultValues = true }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.isReturnDefaultValues = true
+        // App-module JVM tests run on the debug variant: AGP does not merge test-only manifests (Compose's
+        // ComponentActivity host) into an application's release unit-test manifest. Library modules test both.
+        unitTests.all { if (it.name.contains("Release")) it.enabled = false }
+    }
     lint {
         abortOnError = true
         checkReleaseBuilds = true
@@ -103,6 +109,7 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    testImplementation(libs.androidx.compose.ui.test.manifest)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso)
     androidTestImplementation(platform(libs.androidx.compose.bom))

@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,7 +28,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.ScreenShare
+import androidx.compose.material.icons.automirrored.outlined.ScreenShare
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -213,7 +212,7 @@ private fun StatusLine(label: String, ok: Boolean) {
 fun SharingBanner(onOpen: () -> Unit) {
     Card(onClick = onOpen, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.ScreenShare, null)
+            Icon(Icons.AutoMirrored.Outlined.ScreenShare, null)
             Spacer(Modifier.width(12.dp))
             Text("Your screen is being shared. Tap to stop.", modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive })
         }
@@ -262,8 +261,7 @@ fun PermissionsScreen(onBack: () -> Unit, vm: ChildHomeViewModel = hiltViewModel
 }
 
 private fun appNotificationSettings(context: Context): Intent =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-    else Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
 
 @Composable
 private fun PermissionCard(title: String, granted: Boolean?, description: String, action: String?, onAction: () -> Unit) {
@@ -304,7 +302,7 @@ fun ScreenShareConsentScreen(onBack: () -> Unit, vm: ScreenShareConsentViewModel
         CenteredContent(Modifier.padding(padding)) {
             Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Outlined.ScreenShare, null, Modifier.size(56.dp))
+                Icon(Icons.AutoMirrored.Outlined.ScreenShare, null, Modifier.size(56.dp))
                 when (val s = state) {
                     is ShareState.Incoming -> {
                         Text("${s.session.requestedByDisplayName ?: "Your parent"} wants to see your screen", style = MaterialTheme.typography.headlineSmall)

@@ -11,10 +11,15 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+// Optional Maven Central mirror for restricted networks (see TROUBLESHOOTING.md), e.g.
+// familysafety.mavenMirror=https://maven-central.storage-download.googleapis.com/maven2
+val mavenMirror: String? = providers.gradleProperty("familysafety.mavenMirror").orNull
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
+        if (mavenMirror != null) maven(mavenMirror)
         mavenCentral()
     }
 }

@@ -8,3 +8,10 @@ plugins {
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.hilt) apply false
 }
+
+// Robolectric downloads android-all runtime jars itself; reuse the optional mirror when configured.
+providers.gradleProperty("familysafety.mavenMirror").orNull?.let { mirror ->
+    subprojects {
+        tasks.withType<Test>().configureEach { systemProperty("robolectric.dependency.repo.url", mirror) }
+    }
+}

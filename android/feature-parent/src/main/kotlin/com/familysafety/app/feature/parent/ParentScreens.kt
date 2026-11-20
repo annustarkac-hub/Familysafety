@@ -24,7 +24,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.ScreenShare
+import androidx.compose.material.icons.automirrored.outlined.ScreenShare
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.WavingHand
@@ -295,7 +295,7 @@ fun DeviceDetailsScreen(
                     item { SectionHeader("Actions") }
                     item { ActionItem(Icons.Outlined.BarChart, "Screen-time reports", "Weekly and monthly trends") { onAnalytics(d.id) } }
                     item { ActionItem(Icons.Outlined.Apps, "Application activity", "Usage ranking by app") { onApps(d.id) } }
-                    item { ActionItem(Icons.Outlined.ScreenShare, "View screen", "Your child must approve every session") { onViewScreen(d.id) } }
+                    item { ActionItem(Icons.AutoMirrored.Outlined.ScreenShare, "View screen", "Your child must approve every session") { onViewScreen(d.id) } }
                     item { ActionItem(Icons.Outlined.WavingHand, "Ask to check in", "Sends a notification to your child") { vm.requestCheckIn() } }
                     item { ActionItem(Icons.Outlined.Shield, "Limits & safety settings", "Daily limit, bedtime, screen sharing") { onSettings(d.id) } }
                     item { HorizontalDivider() }

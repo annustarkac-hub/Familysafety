@@ -32,7 +32,6 @@ class Notifier(private val context: Context) {
     }
 
     fun createChannels() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannels(listOf(
             NotificationChannel(CHANNEL_ALERTS, "Safety alerts", NotificationManager.IMPORTANCE_HIGH).apply {
@@ -108,6 +107,9 @@ class Notifier(private val context: Context) {
     }
 
     private fun notifySafely(id: Int, n: android.app.Notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
         try {
             NotificationManagerCompat.from(context).notify(id, n)
         } catch (e: SecurityException) {
