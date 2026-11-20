@@ -1,0 +1,671 @@
+openapi: 3.0.3
+info:
+  title: Family Safety API
+  version: 1.0.0
+  description: |
+    Backend API for the Family Safety Android app (Parent and Child roles).
+
+    * All endpoints except register/login/refresh require `Authorization: Bearer <accessToken>`.
+    * Access tokens are HS256 JWTs (15 min). Refresh tokens are opaque, single-use and rotated on every refresh;
+      re-using a rotated refresh token revokes the whole session family (`REFRESH_TOKEN_REUSED`).
+    * Authorization is enforced server-side on every request: role (PARENT/CHILD), family membership and
+      ACTIVE device pairing. Resources of other families return `404` (not `403`) to prevent probing.
+    * Errors use the `Error` schema with a stable machine-readable `code`.
+    * Realtime events and WebRTC signaling use the WebSocket at `/ws` (see `x-websocket` below).
+servers:
+  - url: https://api.familysafety.example
+    description: Production (placeholder — replace with your deployment)
+  - url: http://10.0.2.2:8080
+    description: Local development from the Android emulator (REQUIRE_HTTPS=false only)
+security:
+  - bearerAuth: []
+tags:
+  - name: Authentication
+  - name: Pairing
+  - name: Devices
+  - name: Usage
+  - name: Screen sharing
+  - name: Safety
+
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a Parent or Child account and sign in this device
+      description: A PARENT registration also creates the parent's family. Rate limited per IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { description: Registered, content: { application/json: { schema: { $ref: '#/components/schemas/TokenResponse' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { description: EMAIL_ALREADY_REGISTERED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Sign in
+      description: After 5 failed attempts the account is locked for 15 minutes (`423 ACCOUNT_LOCKED`).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: Signed in, content: { application/json: { schema: { $ref: '#/components/schemas/TokenResponse' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { description: INVALID_CREDENTIALS, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '423': { description: ACCOUNT_LOCKED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/v1/auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Rotate the refresh token and obtain a new access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties: { refreshToken: { type: string, maxLength: 128 } }
+      responses:
+        '200': { description: New token pair, content: { application/json: { schema: { $ref: '#/components/schemas/TokenResponse' } } } }
+        '401':
+          description: INVALID_REFRESH_TOKEN | REFRESH_TOKEN_REUSED | REFRESH_TOKEN_EXPIRED | SESSION_REVOKED
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /api/v1/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke the current session (and close its WebSocket connections)
+      responses:
+        '204': { description: Logged out }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Current user, bound device and pairing status
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  deviceId: { type: string, format: uuid }
+                  paired: { type: boolean }
+
+  /api/v1/pairing/create:
+    post:
+      tags: [Pairing]
+      summary: (PARENT) Create a single-use pairing code valid for 10 minutes
+      description: Max 5 unexpired codes per family. Codes are stored only as an HMAC-SHA256 with a server pepper.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { childLabel: { type: string, maxLength: 80 } }
+      responses:
+        '201':
+          description: Code created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pairingTokenId: { type: string, format: uuid }
+                  code: { type: string, example: 'K7QM-2XRP', description: '8 chars from 23456789ABCDEFGHJKMNPQRSTUVWXYZ, formatted XXXX-XXXX' }
+                  expiresAt: { type: string, format: date-time }
+                  childLabel: { type: string, nullable: true }
+        '403': { $ref: '#/components/responses/ForbiddenRole' }
+        '429': { description: TOO_MANY_ACTIVE_CODES, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/pairing/accept:
+    post:
+      tags: [Pairing]
+      summary: (CHILD) Accept a pairing code on the child's own device
+      description: Rate limited to 5 attempts/minute and 20/hour per child account. Separators and case are ignored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties: { code: { type: string, minLength: 8, maxLength: 16 } }
+      responses:
+        '200':
+          description: Paired
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pairingId: { type: string, format: uuid }
+                  familyId: { type: string, format: uuid }
+                  familyName: { type: string }
+                  deviceId: { type: string, format: uuid }
+                  pairedAt: { type: string, format: date-time }
+                  parents: { type: array, items: { type: string } }
+        '400': { description: INVALID_PAIRING_CODE, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/ForbiddenRole' }
+        '409': { description: DEVICE_ALREADY_PAIRED | ALREADY_IN_ANOTHER_FAMILY, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: PAIRING_CODE_EXPIRED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/v1/devices:
+    get:
+      tags: [Devices]
+      summary: List devices
+      description: PARENT — all actively paired child devices of the family. CHILD — the child's own devices.
+      responses:
+        '200': { description: Devices, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Device' } } } } }
+  /api/v1/devices/{deviceId}:
+    parameters: [ { $ref: '#/components/parameters/DeviceIdPath' } ]
+    get:
+      tags: [Devices]
+      summary: Device details (paired parent or the child on that device)
+      responses:
+        '200': { description: Device, content: { application/json: { schema: { $ref: '#/components/schemas/Device' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Devices]
+      summary: (PARENT) Revoke a paired device
+      description: |
+        Pairing → REVOKED, device → REVOKED, all auth sessions of the device revoked, open screen-sharing
+        sessions stopped, realtime `device.revoked` sent and the device's WebSocket closed. The child may sign
+        in again but the device is unpaired until a new pairing code is used.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, properties: { reason: { type: string, maxLength: 64 } } }
+      responses:
+        '204': { description: Revoked }
+        '403': { $ref: '#/components/responses/ForbiddenRole' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/devices/{deviceId}/disconnect-request:
+    parameters: [ { $ref: '#/components/parameters/DeviceIdPath' } ]
+    post:
+      tags: [Devices]
+      summary: (CHILD) Ask parents to disconnect this device (creates a DISCONNECT_REQUEST alert)
+      responses:
+        '202': { description: Request sent }
+        '409': { description: DEVICE_NOT_PAIRED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/v1/usage/sync:
+    post:
+      tags: [Usage]
+      summary: (CHILD, paired device) Upload per-day per-app foreground totals
+      description: |
+        Snapshot semantics: each submitted day replaces that day's stored records, so retries are idempotent.
+        Dates must be within [today-35, today+1] in the supplied timezone. Totals are recomputed server-side.
+        Triggers configured risk alerts (daily limit, bedtime usage).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UsageSyncRequest' }
+      responses:
+        '200':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  acceptedDays: { type: integer }
+                  acceptedRecords: { type: integer }
+                  serverTime: { type: string, format: date-time }
+        '400': { description: VALIDATION_FAILED | INVALID_USAGE_DATE | INVALID_USAGE_TOTAL | DUPLICATE_DAYS | INVALID_ACTIVITY_RANGE, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/ForbiddenRole' }
+        '409': { description: DEVICE_NOT_PAIRED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/usage/daily:
+    get:
+      tags: [Usage]
+      summary: Usage for one day (apps sorted by foreground time)
+      parameters:
+        - { $ref: '#/components/parameters/DeviceIdQuery' }
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Daily usage, content: { application/json: { schema: { $ref: '#/components/schemas/DailyUsage' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/usage/weekly:
+    get:
+      tags: [Usage]
+      summary: 7 days ending at endDate (inclusive), with daily totals and top apps
+      parameters:
+        - { $ref: '#/components/parameters/DeviceIdQuery' }
+        - { name: endDate, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Weekly report, content: { application/json: { schema: { $ref: '#/components/schemas/PeriodUsage' } } } }
+  /api/v1/usage/monthly:
+    get:
+      tags: [Usage]
+      summary: Calendar month report
+      parameters:
+        - { $ref: '#/components/parameters/DeviceIdQuery' }
+        - { name: month, in: query, required: true, schema: { type: string, example: '2026-11' } }
+      responses:
+        '200': { description: Monthly report, content: { application/json: { schema: { $ref: '#/components/schemas/PeriodUsage' } } } }
+  /api/v1/usage/applications:
+    get:
+      tags: [Usage]
+      summary: Application ranking for a date range (max 93 days)
+      parameters:
+        - { $ref: '#/components/parameters/DeviceIdQuery' }
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: Ranking
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deviceId: { type: string, format: uuid }
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  applications: { type: array, items: { $ref: '#/components/schemas/AppRanking' } }
+        '400': { description: INVALID_RANGE, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/v1/screen-sharing/request:
+    post:
+      tags: [Screen sharing]
+      summary: (PARENT) Request to view a paired child's screen
+      description: Creates a REQUESTED session (expires after 90 s) and pushes `screen_share.requested` to the device.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [deviceId], properties: { deviceId: { type: string, format: uuid } } } } }
+      responses:
+        '201': { description: Requested, content: { application/json: { schema: { $ref: '#/components/schemas/ScreenShareSession' } } } }
+        '403': { description: FORBIDDEN_ROLE | SCREEN_SHARING_DISABLED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: SESSION_ALREADY_OPEN, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/screen-sharing/approve:
+    post:
+      tags: [Screen sharing]
+      summary: (CHILD) Approve a pending request; returns ICE servers
+      description: Moves REQUESTED → APPROVED. Capture must start (first WebRTC offer) within 2 minutes.
+      requestBody: { $ref: '#/components/requestBodies/SessionRef' }
+      responses:
+        '200': { description: Approved, content: { application/json: { schema: { $ref: '#/components/schemas/ScreenShareSession' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: INVALID_SESSION_STATE, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: SESSION_EXPIRED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/screen-sharing/reject:
+    post:
+      tags: [Screen sharing]
+      summary: (CHILD) Decline a pending request
+      requestBody: { $ref: '#/components/requestBodies/SessionRef' }
+      responses:
+        '200': { description: Rejected, content: { application/json: { schema: { $ref: '#/components/schemas/ScreenShareSession' } } } }
+        '409': { description: INVALID_SESSION_STATE, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/screen-sharing/stop:
+    post:
+      tags: [Screen sharing]
+      summary: (either participant) End a session. Idempotent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId: { type: string, format: uuid }
+                reason: { type: string, enum: [USER_STOPPED, CAPTURE_FAILED, CONNECTION_FAILED, PERMISSION_DENIED], description: 'USER_STOPPED → STOPPED; others → FAILED' }
+      responses:
+        '200': { description: Stopped, content: { application/json: { schema: { $ref: '#/components/schemas/ScreenShareSession' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/screen-sharing/status:
+    get:
+      tags: [Screen sharing]
+      summary: Current open session (with ICE servers for participants) and recent history
+      parameters:
+        - { name: sessionId, in: query, schema: { type: string, format: uuid } }
+        - { name: deviceId, in: query, schema: { type: string, format: uuid }, description: 'Required for parents when sessionId is absent' }
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active: { allOf: [ { $ref: '#/components/schemas/ScreenShareSession' } ], nullable: true }
+                  recent: { type: array, items: { $ref: '#/components/schemas/ScreenShareSession' } }
+
+  /api/v1/safety/alerts:
+    get:
+      tags: [Safety]
+      summary: List alerts (newest first, cursor pagination)
+      description: PARENT — alerts addressed to parents in the family. CHILD — every alert concerning their own device (transparency).
+      parameters:
+        - { name: deviceId, in: query, schema: { type: string, format: uuid } }
+        - { name: unacknowledgedOnly, in: query, schema: { type: boolean, default: false } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: before, in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: Alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts: { type: array, items: { $ref: '#/components/schemas/SafetyAlert' } }
+                  nextBefore: { type: string, format: date-time, nullable: true }
+    post:
+      tags: [Safety]
+      summary: Create an alert
+      description: |
+        CHILD may create CHECK_IN, INCIDENT_REPORT, HELP_REQUEST, USAGE_ACCESS_REVOKED (delivered to parents).
+        PARENT may create CHECK_IN_REQUEST for a paired `deviceId` (delivered to the child).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { $ref: '#/components/schemas/AlertType' }
+                message: { type: string, maxLength: 1000 }
+                deviceId: { type: string, format: uuid }
+                category: { type: string, maxLength: 40 }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/SafetyAlert' } } } }
+        '403': { description: ALERT_TYPE_NOT_ALLOWED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: DEVICE_NOT_PAIRED | ALERT_ALREADY_RAISED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/safety/alerts/{alertId}/acknowledge:
+    post:
+      tags: [Safety]
+      summary: Mark an alert addressed to the caller as seen
+      parameters: [ { name: alertId, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses:
+        '200': { description: Acknowledged, content: { application/json: { schema: { $ref: '#/components/schemas/SafetyAlert' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/safety/settings:
+    get:
+      tags: [Safety]
+      summary: Safety settings for a device (paired parent or the child on that device)
+      parameters: [ { $ref: '#/components/parameters/DeviceIdQuery' } ]
+      responses:
+        '200': { description: Settings, content: { application/json: { schema: { $ref: '#/components/schemas/SafetySettings' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Safety]
+      summary: (PARENT) Replace a device's safety settings
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SafetySettingsUpdate' } } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/SafetySettings' } } } }
+        '400': { description: VALIDATION_FAILED | INVALID_BEDTIME, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/ForbiddenRole' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    DeviceIdPath: { name: deviceId, in: path, required: true, schema: { type: string, format: uuid } }
+    DeviceIdQuery: { name: deviceId, in: query, required: true, schema: { type: string, format: uuid } }
+  requestBodies:
+    SessionRef:
+      required: true
+      content: { application/json: { schema: { type: object, required: [sessionId], properties: { sessionId: { type: string, format: uuid } } } } }
+  responses:
+    ValidationError:
+      description: VALIDATION_FAILED (see fieldErrors) or MALFORMED_REQUEST
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unauthorized:
+      description: Missing/invalid/expired token or revoked session (empty body)
+    ForbiddenRole:
+      description: FORBIDDEN_ROLE — not available for the caller's role
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Resource does not exist or belongs to another family (DEVICE_NOT_FOUND, SESSION_NOT_FOUND, ALERT_NOT_FOUND, ...)
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    RateLimited:
+      description: RATE_LIMITED — see Retry-After header
+      headers: { Retry-After: { schema: { type: integer } } }
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  schemas:
+    Error:
+      type: object
+      required: [code, message, status]
+      properties:
+        code: { type: string, example: VALIDATION_FAILED }
+        message: { type: string }
+        status: { type: integer }
+        path: { type: string }
+        requestId: { type: string }
+        timestamp: { type: string, format: date-time }
+        fieldErrors:
+          type: array
+          items: { type: object, properties: { field: { type: string }, message: { type: string } } }
+    Role: { type: string, enum: [PARENT, CHILD] }
+    DeviceInfo:
+      type: object
+      required: [installationId, deviceName]
+      properties:
+        installationId: { type: string, pattern: '^[A-Za-z0-9-]{8,64}$', description: 'Random per-install id (not a hardware identifier)' }
+        deviceName: { type: string, maxLength: 80 }
+        manufacturer: { type: string, maxLength: 80 }
+        model: { type: string, maxLength: 80 }
+        osVersion: { type: string, maxLength: 32 }
+        appVersion: { type: string, maxLength: 32 }
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName, role, device]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, minLength: 12, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+        role: { $ref: '#/components/schemas/Role' }
+        device: { $ref: '#/components/schemas/DeviceInfo' }
+    LoginRequest:
+      type: object
+      required: [email, password, device]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, maxLength: 128 }
+        device: { $ref: '#/components/schemas/DeviceInfo' }
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        displayName: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        familyId: { type: string, format: uuid, nullable: true }
+        familyName: { type: string, nullable: true }
+    TokenResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        accessTokenExpiresAt: { type: string, format: date-time }
+        refreshToken: { type: string, description: 'Opaque, single-use; store securely' }
+        refreshTokenExpiresAt: { type: string, format: date-time }
+        tokenType: { type: string, example: Bearer }
+        user: { $ref: '#/components/schemas/User' }
+        deviceId: { type: string, format: uuid }
+    Device:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        deviceName: { type: string }
+        manufacturer: { type: string }
+        model: { type: string }
+        osVersion: { type: string }
+        appVersion: { type: string }
+        status: { type: string, enum: [ACTIVE, REVOKED] }
+        lastSeenAt: { type: string, format: date-time }
+        ownerUserId: { type: string, format: uuid }
+        ownerDisplayName: { type: string }
+        pairingId: { type: string, format: uuid }
+        pairingStatus: { type: string, enum: [ACTIVE, REVOKED] }
+        pairedAt: { type: string, format: date-time }
+        familyName: { type: string }
+        latestUsageDate: { type: string, format: date }
+        latestUsageForegroundMs: { type: integer, format: int64 }
+        activeScreenShareSessionId: { type: string, format: uuid }
+    UsageSyncRequest:
+      type: object
+      required: [days]
+      properties:
+        timezone: { type: string, example: Europe/Berlin }
+        days:
+          type: array
+          minItems: 1
+          maxItems: 31
+          items:
+            type: object
+            required: [date]
+            properties:
+              date: { type: string, format: date }
+              firstActivityAt: { type: string, format: date-time }
+              lastActivityAt: { type: string, format: date-time }
+              apps:
+                type: array
+                maxItems: 500
+                items:
+                  type: object
+                  required: [packageName, foregroundMs]
+                  properties:
+                    packageName: { type: string, pattern: '^[A-Za-z0-9_.]+$', maxLength: 255 }
+                    appLabel: { type: string, maxLength: 255 }
+                    foregroundMs: { type: integer, format: int64, minimum: 0, maximum: 86400000 }
+                    launchCount: { type: integer, minimum: 0, maximum: 100000 }
+                    lastUsedAt: { type: string, format: date-time }
+    AppUsage:
+      type: object
+      properties:
+        packageName: { type: string }
+        appLabel: { type: string }
+        foregroundMs: { type: integer, format: int64 }
+        launchCount: { type: integer }
+        lastUsedAt: { type: string, format: date-time }
+    DailyUsage:
+      type: object
+      properties:
+        deviceId: { type: string, format: uuid }
+        date: { type: string, format: date }
+        totalForegroundMs: { type: integer, format: int64 }
+        appCount: { type: integer }
+        firstActivityAt: { type: string, format: date-time }
+        lastActivityAt: { type: string, format: date-time }
+        dailyLimitMinutes: { type: integer, nullable: true }
+        apps: { type: array, items: { $ref: '#/components/schemas/AppUsage' } }
+    AppRanking:
+      type: object
+      properties:
+        rank: { type: integer }
+        packageName: { type: string }
+        appLabel: { type: string }
+        totalForegroundMs: { type: integer, format: int64 }
+        launchCount: { type: integer }
+        lastUsedAt: { type: string, format: date-time }
+        daysUsed: { type: integer }
+    PeriodUsage:
+      type: object
+      properties:
+        deviceId: { type: string, format: uuid }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        totalForegroundMs: { type: integer, format: int64 }
+        averageDailyMs: { type: integer, format: int64, description: 'Average over days that have data' }
+        daysWithData: { type: integer }
+        days:
+          type: array
+          items: { type: object, properties: { date: { type: string, format: date }, totalForegroundMs: { type: integer, format: int64 }, appCount: { type: integer } } }
+        topApps: { type: array, items: { $ref: '#/components/schemas/AppRanking' } }
+    IceServer:
+      type: object
+      properties:
+        urls: { type: array, items: { type: string } }
+        username: { type: string, description: 'TURN only: "<expiryEpoch>:<userId>"' }
+        credential: { type: string, description: 'TURN only: base64(HMAC-SHA1(secret, username))' }
+    ScreenShareSession:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        deviceId: { type: string, format: uuid }
+        status: { type: string, enum: [REQUESTED, APPROVED, ACTIVE, REJECTED, STOPPED, EXPIRED, FAILED] }
+        requestedByUserId: { type: string, format: uuid }
+        requestedByDisplayName: { type: string }
+        requestedAt: { type: string, format: date-time }
+        requestExpiresAt: { type: string, format: date-time }
+        approvedAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        maxEndAt: { type: string, format: date-time, description: 'APPROVED: start deadline; ACTIVE: hard end (30 min)' }
+        endReason: { type: string, example: STOPPED_BY_CHILD }
+        iceServers: { type: array, items: { $ref: '#/components/schemas/IceServer' }, description: 'Only for participants while APPROVED/ACTIVE' }
+    AlertType:
+      type: string
+      enum: [CHECK_IN, CHECK_IN_REQUEST, INCIDENT_REPORT, HELP_REQUEST, USAGE_ACCESS_REVOKED, DISCONNECT_REQUEST,
+             SCREEN_TIME_LIMIT_EXCEEDED, BEDTIME_USAGE, DEVICE_PAIRED, DEVICE_REVOKED, SCREEN_SHARE_REJECTED]
+    SafetyAlert:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        familyId: { type: string, format: uuid }
+        deviceId: { type: string, format: uuid, nullable: true }
+        createdByUserId: { type: string, format: uuid, nullable: true }
+        type: { $ref: '#/components/schemas/AlertType' }
+        severity: { type: string, enum: [INFO, LOW, MEDIUM, HIGH, CRITICAL] }
+        audience: { type: string, enum: [PARENTS, CHILD] }
+        title: { type: string }
+        message: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        acknowledgedAt: { type: string, format: date-time, nullable: true }
+    SafetySettings:
+      type: object
+      properties:
+        deviceId: { type: string, format: uuid }
+        dailyLimitMinutes: { type: integer, nullable: true, minimum: 15, maximum: 1440 }
+        bedtimeStart: { type: string, example: '21:00:00', nullable: true }
+        bedtimeEnd: { type: string, example: '07:00:00', nullable: true }
+        limitAlertsEnabled: { type: boolean }
+        bedtimeAlertsEnabled: { type: boolean }
+        screenSharingEnabled: { type: boolean }
+        usageRetentionDays: { type: integer, minimum: 7, maximum: 365 }
+        updatedAt: { type: string, format: date-time }
+    SafetySettingsUpdate:
+      allOf:
+        - { $ref: '#/components/schemas/SafetySettings' }
+        - type: object
+          required: [deviceId]
+
+x-websocket:
+  url: wss://<host>/ws
+  authentication: 'Authorization: Bearer <accessToken> header on the upgrade request (never in the URL). Same session/revocation checks as REST.'
+  clientMessages:
+    ping: { type: ping }
+    signal:
+      description: 'Relayed only between the requesting parent and the child device of an APPROVED/ACTIVE session. Max 64 KiB. Only the child may send "offer"; only the parent may send "answer". The first offer moves the session to ACTIVE.'
+      example: { type: signal, sessionId: '<uuid>', payload: { kind: 'offer|answer|ice|bye', sdp: '...', candidate: '...', sdpMid: '0', sdpMLineIndex: 0 } }
+  serverEvents:
+    - screen_share.requested   # payload: ScreenShareSession (to child device)
+    - screen_share.updated     # payload: ScreenShareSession (to both participants)
+    - signal                   # payload: { sessionId, payload }
+    - pairing.completed        # payload: { deviceId, pairingId, childDisplayName, deviceName } (to parents)
+    - device.revoked           # payload: { deviceId } (to device and parents; device socket then closed)
+    - safety.alert             # payload: SafetyAlert (to its audience)
+    - usage.synced             # payload: { deviceId, dates } (to parents)
+    - safety.settings_updated  # payload: SafetySettings (to child device)
+    - pong
+    - error                    # payload: { code, sessionId? }

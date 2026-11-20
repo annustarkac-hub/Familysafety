@@ -1,0 +1,8 @@
+# TLS-terminating reverse proxy. With API_HOSTNAME=localhost Caddy issues a local dev certificate;
+# with a public DNS name it obtains a publicly trusted certificate automatically (ACME).
+{$API_HOSTNAME} {
+	encode gzip
+	reverse_proxy backend:8080 {
+		header_up X-Forwarded-Proto https
+	}
+}

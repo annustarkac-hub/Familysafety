@@ -1,0 +1,84 @@
+# Development infrastructure.
+#   cp .env.example .env                 # fill in secrets
+#   ./scripts/build-backend.sh           # builds backend/build/libs/family-safety-backend.jar
+#   docker compose up -d                 # postgres + backend + caddy (TLS)
+#   docker compose --profile turn up -d  # additionally start coturn
+name: family-safety
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-familysafety}
+      POSTGRES_USER: ${POSTGRES_USER:-familysafety}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"   # localhost only
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../infrastructure/docker/backend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-familysafety}
+      DATABASE_USERNAME: ${POSTGRES_USER:-familysafety}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      PAIRING_PEPPER: ${PAIRING_PEPPER}
+      REQUIRE_HTTPS: ${REQUIRE_HTTPS:-true}
+      FORWARD_HEADERS_STRATEGY: native
+      STUN_URLS: ${STUN_URLS:-stun:stun.l.google.com:19302}
+      TURN_URLS: ${TURN_URLS:-}
+      TURN_SECRET: ${TURN_SECRET:-}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+    ports:
+      # Plain HTTP on localhost for the emulator (10.0.2.2:8080) with REQUIRE_HTTPS=false only.
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      API_HOSTNAME: ${API_HOSTNAME:-localhost}
+    ports:
+      - "443:443"
+    volumes:
+      - ./infrastructure/docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+
+  coturn:
+    image: coturn/coturn:4.6
+    profiles: ["turn"]
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - "-n"
+      - "--use-auth-secret"
+      - "--static-auth-secret=${TURN_SECRET}"
+      - "--realm=familysafety"
+      - "--no-cli"
+      - "--fingerprint"
+      - "--min-port=49160"
+      - "--max-port=49200"
+
+volumes:
+  pgdata:
+  caddy_data:
