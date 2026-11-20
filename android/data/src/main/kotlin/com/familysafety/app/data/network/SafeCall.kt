@@ -19,7 +19,7 @@ suspend fun <T> safeApiCall(block: suspend () -> T): AppResult<T> = try {
 } catch (e: HttpException) {
     AppResult.Failure(httpError(e.code(), e.response()?.errorBody()?.string()))
 } catch (e: IOException) {
-    AppResult.Failure(AppError.Network())
+    AppResult.Failure(AppError.Network(NetworkErrors.describe(e, null)))
 } catch (e: SerializationException) {
     AppResult.Failure(AppError.Unexpected("The server returned an unexpected response."))
 } catch (e: IllegalArgumentException) {

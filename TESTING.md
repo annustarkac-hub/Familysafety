@@ -21,7 +21,7 @@ Requirements: Docker (backend tests start PostgreSQL 16 via Testcontainers), JDK
 | `EndToEndFlowTest` | The 10 required steps (below) over real HTTP + WebSocket |
 | `unit/PureLogicTest` | Bedtime window across midnight; pairing-code normalisation; ranking aggregation |
 
-## Android (`android/`, `./gradlew test`) — 107 test executions (debug + release variants of library modules)
+## Android (`android/`, `./gradlew test`) — 142 test executions (debug + release variants of library modules)
 
 | Module | Tests |
 |---|---|
@@ -30,7 +30,8 @@ Requirements: Docker (backend tests start PostgreSQL 16 via Testcontainers), JDK
 | `core` (5×2) | Compose: error retry, empty state action, confirm dialog, password visibility a11y, chart content description in dark theme |
 | `feature-parent` (5×2) | `PairDeviceViewModelTest` (realtime pairing completion), `ScreenViewerViewModelTest` (waits for consent; rejection ends without connecting; errors), `AlertRowUiTest` |
 | `feature-child` (6×2) | `ChildPairingViewModelTest` (invalid codes never sent; expiry message), `ChildSafetyViewModelTest`, transparency UI tests |
-| `app` (6, debug) | `AuthViewModelTest` (validation, role sent, errors), `AuthAndRoutingUiTest` (role selector, error rendering, loading route) |
+| `app` (15, debug) | `AuthViewModelTest` (validation, role sent, errors), `AuthAndRoutingUiTest` (role selector, error rendering, loading route), `AuthServerUxTest` (setup-server prompt, host display, password check, network error → server settings, sheet error state), `ServerSettingsViewModelTest` (placeholder not prefilled, **saves only after the server answers**, unreachable not saved, invalid input makes no request) |
+| `data` additions | `ServerUrlsTest`, `BaseUrlInterceptorTest` (requests really reach the configured server), `NetworkErrorsTest`, `ServerHealthCheckerTest`, `ServerConfigStoreTest`, `SessionEndedListenerTest` (background work stops when the server ends the session) |
 
 Notes:
 * Robolectric cannot provide `AndroidKeyStore`; tests use a reversible `FakeCipher`. The real Keystore cipher must be

@@ -161,7 +161,12 @@ fun ChildDashboardScreen(
     val snackbar = remember { SnackbarHostState() }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.onResume() }
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); vm.consumeMessage() } }
-    LaunchedEffect(share) { if (share is ShareState.Incoming) onConsent() }
+    // Open the consent screen once per incoming request, not every time the dashboard is shown again.
+    var handledRequest by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(share) {
+        val incoming = share as? ShareState.Incoming ?: return@LaunchedEffect
+        if (handledRequest != incoming.session.id) { handledRequest = incoming.session.id; onConsent() }
+    }
 
     val user = (auth as? AuthState.SignedIn)?.user
     Scaffold(topBar = { TopAppBar(title = { Text("Family Safety") }) }, snackbarHost = { SnackbarHost(snackbar) }) { padding ->

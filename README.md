@@ -43,6 +43,12 @@ docs/                 Design, API, security, privacy, deployment, testing report
 docker-compose.yml    PostgreSQL, backend, Caddy (TLS), optional coturn
 ```
 
+## Connecting the app to a server
+
+The app needs a Family Safety server reachable over HTTPS. On the sign-in screen tap **Server**, enter the address and
+**Save** (the connection is tested first). The fastest way to get one is in **[docs/SERVER_QUICKSTART.md](docs/SERVER_QUICKSTART.md)**
+(Docker + an HTTPS tunnel, about 10 minutes).
+
 ## Quick start (local development)
 
 Prerequisites: JDK 21, Docker, Android SDK (platform 35, build-tools 35). See [BUILD_GUIDE.md](BUILD_GUIDE.md).
@@ -61,21 +67,21 @@ and add that IP to `app/src/debug/res/xml/network_security_config.xml`) or deplo
 | Check | Result |
 |---|---|
 | Backend tests (`./gradlew test`, Testcontainers PostgreSQL 16) | **46 passed, 0 failed** |
-| Android JVM/Robolectric/Compose tests (`./gradlew test`, debug+release variants) | **107 executions passed, 0 failed** |
-| Android Lint (`./gradlew lint`) | **0 errors** (warnings: newer-dependency notices) |
+| Android JVM/Robolectric/Compose tests (`./gradlew test`, debug+release variants) | **142 executions passed, 0 failed** |
+| Android Lint (`./gradlew lint`) | **0 errors**, no correctness warnings (only newer-dependency notices) |
 | `./gradlew assembleRelease` (R8 + resource shrinking) | **Built and signed (v2+v3), apksigner verified** |
 | Docker Compose stack + `scripts/e2e-smoke.py` | **Passed** (all 10 steps over HTTP) |
 | TLS enforcement via Caddy | **Verified** (plain HTTP → 403 `HTTPS_REQUIRED`; HTTPS → API) |
 | OpenAPI spec validation | **Valid** |
-| Install / launch / both roles on a **physical device** | **Not performed** — no device available in the build environment |
+| Install / launch on a **physical device** | v1.0.0 installed and launched on the owner's phone (sign-up screen shown; failed only because no server was configured). v1.1.0 not yet run on a device. |
 
 Details: [docs/reports/TEST_REPORT.md](docs/reports/TEST_REPORT.md), [docs/reports/BUILD_REPORT.md](docs/reports/BUILD_REPORT.md).
 
 ## Known limitations
 
 * **No physical-device verification yet** (see above). The device test plan is in [TESTING.md](TESTING.md#physical-device-test-plan).
-* The delivered release APK is built against the placeholder API `https://api.familysafety.example/`. **Rebuild with
-  your own HTTPS endpoint** (`-Pfamilysafety.apiBaseUrl=...`) and **your own signing key**.
+* The release APK ships without a real server address: set it in the app (**Server** on the sign-in screen) or build
+  with `-Pfamilysafety.apiBaseUrl=https://…`. Use **your own signing key** for anything beyond evaluation.
 * **No push provider (FCM) is configured.** Realtime events arrive over a WebSocket held only while the app is in
   the foreground (or while sharing). In the background, alerts are polled by WorkManager (~15 min, subject to Doze).
   A child must open the app (or tap a polled notification) to see a screen-sharing request that arrived while it
@@ -94,4 +100,4 @@ Details: [docs/reports/TEST_REPORT.md](docs/reports/TEST_REPORT.md), [docs/repor
 [Roadmap & progress log](DEVELOPMENT_ROADMAP.md) · [Testing](TESTING.md) · [Build guide](BUILD_GUIDE.md) ·
 [Deployment](docs/DEPLOYMENT.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Contributing](CONTRIBUTING.md) ·
 [Changelog](CHANGELOG.md) · [Android manifest & permissions](docs/ANDROID_MANIFEST.md) ·
-[Dependency inventory](docs/DEPENDENCIES.md)
+[Dependency inventory](docs/DEPENDENCIES.md) · [Server quick start](docs/SERVER_QUICKSTART.md)

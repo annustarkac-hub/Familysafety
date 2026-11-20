@@ -45,7 +45,7 @@ import okhttp3.WebSocketListener
  */
 class RealtimeClient(
     private val client: OkHttpClient,
-    private val baseUrl: String,
+    private val baseUrl: () -> String,
     private val store: SessionStore,
     private val refresher: TokenRefresher,
     private val json: Json,
@@ -62,7 +62,7 @@ class RealtimeClient(
     private var attempt = 0
     private var reconnectJob: Job? = null
 
-    val wsUrl: String get() = baseUrl.trimEnd('/').replaceFirst(Regex("^http"), "ws") + "/ws"
+    val wsUrl: String get() = baseUrl().trimEnd('/').replaceFirst(Regex("^http"), "ws") + "/ws"
 
     @Synchronized
     override fun connect() {

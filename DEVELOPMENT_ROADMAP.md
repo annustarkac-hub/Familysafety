@@ -19,6 +19,10 @@ Legend: ✅ done and verified by automated tests/builds · 🟡 implemented, nee
 | 11 Release configuration & APK | R8, signing via env, versioning, dependency verification, release APK + SHA-256 | ✅ built & signature-verified · 🟡 install on device |
 | 12 Documentation & delivery | All docs, OpenAPI, reports | ✅ |
 
+## 1.1.0 improvement pass
+Triggered by the first real-device run (v1.0.0 installed on a phone failed sign-up because the placeholder server
+host doesn't exist). See CHANGELOG 1.1.0.
+
 ## Next steps (proposed)
 
 1. **Physical-device validation** of the test plan in [TESTING.md](TESTING.md#physical-device-test-plan); fix findings.
@@ -43,3 +47,4 @@ Legend: ✅ done and verified by automated tests/builds · 🟡 implemented, nee
 | 2026-11-20 | Lint: fixed `MissingPermission` (POST_NOTIFICATIONS guard) and `ObsoleteSdkInt`; 0 errors. Release: R8 build signed with a locally generated key outside the repo; apksigner verified v2+v3; R8 keep rules confirmed by dex inspection. Commit `26b7763`. |
 | 2026-11-20 | Docker Compose stack (postgres + backend + Caddy TLS) started; `scripts/e2e-smoke.py` passed 10/10; TLS enforcement verified (HTTP → 403, HTTPS via proxy → API). Dependency verification metadata generated for both builds. OpenAPI spec validated. Documentation written. |
 | 2026-11-20 | Final verification: backend clean test 46/46; Android `test lint --rerun-tasks --no-build-cache` 107/107, lint 0 errors; release APK rebuilt via `scripts/build-apk.sh`, apksigner verified, SHA-256 `3df6cd35…f57a5`. Reports in `docs/reports/`. Physical-device verification remains outstanding. |
+| 2026-11-20 | 1.1.0: first device feedback (sign-up failed: placeholder server). Added in-app server setting with connection test, specific network errors, auth redesign + motion, fixed session-end cleanup, consent re-navigation and refresh storms, ABI splits. Android 142/142 tests, lint clean, release APKs built and verified (same signing key → installs as an update). Backend unchanged (46/46 from the previous run). |

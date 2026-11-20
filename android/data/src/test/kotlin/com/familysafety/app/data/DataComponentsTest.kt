@@ -113,7 +113,7 @@ class RepositoryParsingTest {
 
 @RunWith(RobolectricTestRunner::class)
 class RealtimeParsingTest {
-    private val client = RealtimeClient(OkHttpClient(), "https://api.example.test/", mockk(relaxed = true), mockk(relaxed = true), testJson,
+    private val client = RealtimeClient(OkHttpClient(), { "https://api.example.test/" }, mockk(relaxed = true), mockk(relaxed = true), testJson,
         TestScope(), Dispatchers.Unconfined)
 
     @Test

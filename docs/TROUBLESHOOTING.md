@@ -28,6 +28,7 @@
 
 | Symptom | Fix |
 |---|---|
+| Sign-up/sign-in says *Unable to reach the server* / *Can't find the server* | The app has no reachable server. Tap **Server** on the sign-in screen and enter your server's HTTPS address — see [SERVER_QUICKSTART.md](SERVER_QUICKSTART.md). Builds before 1.1.0 had a placeholder address compiled in and cannot be fixed without updating. |
 | Emulator can't reach backend | Debug build uses `http://10.0.2.2:8080/`; backend must run with `REQUIRE_HTTPS=false` (`dev-up.sh --emulator`). |
 | Physical phone can't reach a LAN backend | Build with `-Pfamilysafety.debugApiBaseUrl=http://<LAN-IP>:8080/` **and** add that IP to `app/src/debug/res/xml/network_security_config.xml`, or use HTTPS. |
 | Child shows no screen time | Grant *Usage access* (Permissions screen). Totals appear after a sync (open Monitoring status → "Share activity summary now"). |

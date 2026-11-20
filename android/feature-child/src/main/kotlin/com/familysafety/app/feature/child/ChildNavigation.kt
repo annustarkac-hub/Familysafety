@@ -1,5 +1,10 @@
 package com.familysafety.app.feature.child
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
@@ -58,7 +63,12 @@ fun ChildRoot(startDestination: String? = null) {
             }
         }
     }) { padding ->
-        NavHost(nav, startDestination = ChildRoutes.HOME, modifier = Modifier.padding(padding)) {
+        NavHost(nav, startDestination = ChildRoutes.HOME, modifier = Modifier.padding(padding),
+            enterTransition = { fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 10 } },
+            exitTransition = { fadeOut(tween(150)) },
+            popEnterTransition = { fadeIn(tween(220)) },
+            popExitTransition = { fadeOut(tween(150)) + slideOutHorizontally(tween(220)) { it / 10 } },
+        ) {
             composable(ChildRoutes.HOME) {
                 ChildDashboardScreen(
                     onPermissions = { nav.navigate(ChildRoutes.PERMISSIONS) },

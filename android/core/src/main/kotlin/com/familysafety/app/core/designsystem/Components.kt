@@ -1,5 +1,7 @@
 package com.familysafety.app.core.designsystem
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -40,6 +43,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -57,7 +61,7 @@ fun CenteredContent(modifier: Modifier = Modifier, content: @Composable () -> Un
 }
 
 @Composable
-fun LoadingState(message: String = "Loading…", modifier: Modifier = Modifier) {
+fun LoadingState(modifier: Modifier = Modifier, message: String = "Loading…") {
     Column(
         modifier.fillMaxSize().padding(24.dp).semantics { contentDescription = message },
         verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
@@ -143,7 +147,8 @@ fun UsageBar(label: String, valueText: String, fraction: Float, modifier: Modifi
             Text(valueText, style = MaterialTheme.typography.bodyMedium)
         }
         Spacer(Modifier.height(4.dp))
-        LinearProgressIndicator(progress = { fraction.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+        val animated by animateFloatAsState(fraction.coerceIn(0f, 1f), animationSpec = tween(600), label = "usageBar")
+        LinearProgressIndicator(progress = { animated }, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -151,13 +156,17 @@ fun UsageBar(label: String, valueText: String, fraction: Float, modifier: Modifi
 fun PasswordField(
     value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier = Modifier,
     isError: Boolean = false, supportingText: String? = null,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    imeAction: ImeAction = ImeAction.Done, onImeAction: () -> Unit = {},
 ) {
     var visible by rememberSaveable { mutableStateOf(false) }
     OutlinedTextField(
         value = value, onValueChange = onValueChange, label = { Text(label) }, singleLine = true, isError = isError,
         supportingText = supportingText?.let { { Text(it) } },
+        leadingIcon = leadingIcon,
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = imeAction, autoCorrectEnabled = false),
+        keyboardActions = KeyboardActions(onAny = { onImeAction() }),
         trailingIcon = {
             IconButton(onClick = { visible = !visible }) {
                 Icon(if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,

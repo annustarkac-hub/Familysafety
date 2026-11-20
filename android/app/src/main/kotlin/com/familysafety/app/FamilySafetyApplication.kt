@@ -6,6 +6,7 @@ import androidx.work.Configuration
 import com.familysafety.app.data.di.ApplicationScope
 import com.familysafety.app.data.notify.Notifier
 import com.familysafety.app.data.realtime.RealtimeLifecycle
+import com.familysafety.app.data.server.ServerConfigStore
 import com.familysafety.app.data.session.SessionStore
 import com.familysafety.app.data.work.WorkScheduler
 import com.familysafety.app.domain.model.Role
@@ -19,6 +20,7 @@ class FamilySafetyApplication : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var notifier: Notifier
     @Inject lateinit var sessionStore: SessionStore
+    @Inject lateinit var serverConfig: ServerConfigStore
     @Inject lateinit var realtimeLifecycle: RealtimeLifecycle
     @Inject lateinit var workScheduler: WorkScheduler
     @Inject @ApplicationScope lateinit var appScope: CoroutineScope
@@ -31,6 +33,7 @@ class FamilySafetyApplication : Application(), Configuration.Provider {
         notifier.createChannels()
         realtimeLifecycle.start()
         appScope.launch {
+            serverConfig.load() // before any network call uses the base URL
             sessionStore.load()
             sessionStore.session.value?.let { s ->
                 val role = Role.valueOf(s.role)

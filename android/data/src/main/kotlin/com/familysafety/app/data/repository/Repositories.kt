@@ -54,6 +54,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -89,6 +90,21 @@ class AuthRepositoryImpl(
             )
         }
     }.stateIn(scope, SharingStarted.Eagerly, AuthState.Loading)
+
+    init {
+        // The session can also end outside this class (e.g. TokenRefresher after the server rejects a refresh
+        // token). Make sure background work and realtime connections always stop with it. Listeners are idempotent.
+        scope.launch {
+            var wasSignedIn = false
+            store.session.collect { s ->
+                if (wasSignedIn && s == null) {
+                    listeners.forEach { it.onSignedOut() }
+                    runCatching { localUsage.clearApps(); localUsage.clearSummaries(); devices.clear(); notified.clear() }
+                }
+                wasSignedIn = s != null
+            }
+        }
+    }
 
     override suspend fun register(email: String, password: String, displayName: String, role: Role): AppResult<Unit> =
         safeApiCall { api.register(RegisterBody(email.trim(), password, displayName.trim(), role.name, deviceInfo.deviceInfo())) }

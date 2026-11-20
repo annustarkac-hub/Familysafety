@@ -24,7 +24,22 @@ Generated 2026-11-20.
 | Dependency verification (`gradle/verification-metadata.xml`, SHA-256) | Active in both builds; all builds above passed verification |
 | `docker compose up` + `scripts/e2e-smoke.py` | PASS |
 
-## Release artifact
+## Release artifacts — 1.1.0 (current)
+
+Built with `scripts/build-apk.sh`, every APK verified with `apksigner` (v2+v3), same signing certificate as 1.0.0
+(SHA-256 `8a881ecc…db59ac`), so 1.1.0 installs over 1.0.0 as an update. versionCode 2, versionName 1.1.0.
+
+| File | Size (bytes) | SHA-256 |
+|---|---|---|
+| FamilySafety-1.1.0-arm64-v8a-release.apk | 13,631,237 | `a32a2943255134e691ccbc981fc9435fbaf9463752cda972ce2dd67bc966d730` |
+| FamilySafety-1.1.0-armeabi-v7a-release.apk | 8,664,219 | `01db98e1ce5b46ff0aef10668b2a9266f43b49a6d9c04a77aac57d8c1dab1026` |
+| FamilySafety-1.1.0-universal-release.apk | 45,499,804 | `227b1fa980c84084877a88c30342199fbcbd9c97f32ecc80d72cc71d008aeaed` |
+| FamilySafety-1.1.0-x86-release.apk | 14,427,251 | `de2f80b3e123c79d749e2f2efa0da5df11a4684b9dcfdf2404a488893569a655` |
+| FamilySafety-1.1.0-x86_64-release.apk | 14,910,084 | `5e69d46ce524b0931f3204cdb6f0c5e1bf01e0b7d6e4428831ed43d2956cbb29` |
+
+The default server address is still a placeholder; users set theirs in the app (sign-in → Server).
+
+## Release artifact (1.0.0, superseded)
 
 | Property | Value |
 |---|---|

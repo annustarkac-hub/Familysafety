@@ -26,6 +26,9 @@ import com.familysafety.app.data.repository.SafetyRepositoryImpl
 import com.familysafety.app.data.repository.ScreenShareRepositoryImpl
 import com.familysafety.app.data.repository.SessionLifecycleListener
 import com.familysafety.app.data.repository.UsageRepositoryImpl
+import com.familysafety.app.data.server.BaseUrlInterceptor
+import com.familysafety.app.data.server.ServerConfigStore
+import com.familysafety.app.data.server.ServerHealthChecker
 import com.familysafety.app.data.session.SessionStore
 import com.familysafety.app.data.session.TokenRefresher
 import com.familysafety.app.data.usage.AndroidUsageCollector
@@ -76,6 +79,13 @@ object DataModule {
     @Provides @BaseUrl fun baseUrl(): String = BuildConfig.API_BASE_URL
 
     @Provides @Singleton
+    fun serverConfig(@ApplicationContext ctx: Context, @BaseUrl baseUrl: String) =
+        ServerConfigStore(ctx, baseUrl, allowCleartext = BuildConfig.DEBUG)
+
+    @Provides @Singleton
+    fun healthChecker(base: OkHttpClient, @IoDispatcher io: CoroutineDispatcher) = ServerHealthChecker(base, io)
+
+    @Provides @Singleton
     fun json(): Json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = true }
 
     @Provides @Singleton fun cipher(): SecretCipher = KeystoreSecretCipher()
@@ -85,7 +95,8 @@ object DataModule {
 
     /** Base client shared by REST and WebSocket. TLS is enforced by the network security config in release. */
     @Provides @Singleton
-    fun baseClient(): OkHttpClient = OkHttpClient.Builder()
+    fun baseClient(server: ServerConfigStore): OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor(BaseUrlInterceptor(server.defaultUrl) { server.current })
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .pingInterval(25, TimeUnit.SECONDS)
@@ -130,9 +141,9 @@ object DataModule {
     @Provides @Singleton fun workScheduler(@ApplicationContext ctx: Context) = WorkScheduler(ctx)
 
     @Provides @Singleton
-    fun realtimeClient(base: OkHttpClient, @BaseUrl baseUrl: String, store: SessionStore, refresher: TokenRefresher, json: Json,
+    fun realtimeClient(base: OkHttpClient, server: ServerConfigStore, store: SessionStore, refresher: TokenRefresher, json: Json,
                        @ApplicationScope scope: CoroutineScope, @IoDispatcher io: CoroutineDispatcher) =
-        RealtimeClient(base, baseUrl, store, refresher, json, scope, io)
+        RealtimeClient(base, { server.current.toString() }, store, refresher, json, scope, io)
 
     @Provides @Singleton fun realtime(client: RealtimeClient): RealtimeRepository = client
     @Provides @Singleton fun realtimeLifecycle(realtime: RealtimeRepository, store: SessionStore) = RealtimeLifecycle(realtime, store)

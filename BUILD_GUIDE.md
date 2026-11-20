@@ -56,15 +56,17 @@ Cleartext HTTP is allowed in debug **only** for the hosts listed in `app/src/deb
                           -Pfamilysafety.versionCode=2 -Pfamilysafety.versionName=1.0.1
    ```
    The script runs `assembleRelease`, verifies the signature with `apksigner`, and writes
-   `dist/FamilySafety-<version>-release.apk` plus a `.sha256` file.
+   `dist/FamilySafety-<version>-<abi>-release.apk` (per ABI + universal) plus `dist/SHA256SUMS`.
 
 Release configuration: R8 minification + resource shrinking (`proguard-rules.pro` keeps kotlinx.serialization
 serializers, Retrofit interfaces and `org.webrtc` JNI classes), v2+v3 APK signing, `allowBackup=false`, HTTPS-only
 network security config. Without signing values `assembleRelease` produces an unsigned APK.
 
 ### APK size
-~45 MB, dominated by WebRTC native libraries for four ABIs (arm64-v8a, armeabi-v7a, x86, x86_64). For Play
-distribution build an App Bundle (`./gradlew bundleRelease`) so devices download one ABI (~15 MB).
+ABI splits are enabled: `assembleRelease` produces `app-arm64-v8a-release.apk` (≈13.6 MB, most phones),
+`armeabi-v7a` (≈8.7 MB, older 32-bit phones), `x86`/`x86_64` (emulators) and `app-universal-release.apk` (≈45 MB, any
+device). `scripts/build-apk.sh` copies all of them to `dist/` with a `SHA256SUMS` file. For Play, build an App Bundle
+(`./gradlew bundleRelease`).
 
 ## Quality gates
 

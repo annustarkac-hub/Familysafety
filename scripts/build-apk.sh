@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Builds, verifies and checksums the release APK.
+# Builds, verifies and checksums the release APKs (per-ABI + universal).
 #
 # Required environment (never commit these):
 #   FS_KEYSTORE_PATH  FS_KEYSTORE_PASSWORD  FS_KEY_ALIAS  FS_KEY_PASSWORD
-# Required Gradle property (or set in ~/.gradle/gradle.properties):
-#   -Pfamilysafety.apiBaseUrl=https://your-api.example.com/
+# Optional Gradle property: -Pfamilysafety.apiBaseUrl=https://your-api.example.com/
+#   (users can also set the server address inside the app on the sign-in screen)
 #
-# Output: dist/FamilySafety-<version>-release.apk and its .sha256
+# Output: dist/FamilySafety-<version>-<abi>-release.apk and SHA256SUMS
 set -euo pipefail
 cd "$(dirname "$0")/../android"
 
@@ -19,12 +19,16 @@ APKSIGNER="$(ls -d "$SDK"/build-tools/*/apksigner | sort -V | tail -1)"
 
 ./gradlew --no-daemon assembleRelease "$@"
 
-APK=app/build/outputs/apk/release/app-release.apk
-VERSION=$(grep -oE '"versionName"[[:space:]]*:[[:space:]]*"[^"]+"' app/build/outputs/apk/release/output-metadata.json | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
-"$APKSIGNER" verify --verbose --print-certs "$APK"
-
+OUTDIR=app/build/outputs/apk/release
+VERSION=$(grep -oE '"versionName"[[:space:]]*:[[:space:]]*"[^"]+"' "$OUTDIR/output-metadata.json" | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
 mkdir -p ../dist
-OUT="../dist/FamilySafety-${VERSION:-unknown}-release.apk"
-cp "$APK" "$OUT"
-(cd ../dist && sha256sum "$(basename "$OUT")" > "$(basename "$OUT").sha256")
-cat "$OUT.sha256"
+: > ../dist/SHA256SUMS
+for apk in "$OUTDIR"/app-*-release.apk; do
+  abi=$(basename "$apk" | sed -E 's/^app-(.*)-release\.apk$/\1/')
+  "$APKSIGNER" verify "$apk"
+  out="FamilySafety-${VERSION:-unknown}-${abi}-release.apk"
+  cp "$apk" "../dist/$out"
+  (cd ../dist && sha256sum "$out" >> SHA256SUMS)
+done
+"$APKSIGNER" verify --print-certs "$OUTDIR/app-universal-release.apk" | grep -E "certificate (DN|SHA-256)"
+cat ../dist/SHA256SUMS

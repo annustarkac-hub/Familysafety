@@ -45,7 +45,7 @@ class AuthViewModelTest {
 
     @Test
     fun `client-side validation blocks bad input without calling the server`() {
-        val vm = AuthViewModel(repo)
+        val vm = AuthViewModel(repo, null)
         vm.update { it.copy(email = "not-an-email", password = "x") }
         vm.submit()
         assertEquals("Enter a valid email address.", vm.form.value.error)
@@ -59,7 +59,7 @@ class AuthViewModelTest {
     @Test
     fun `registration sends the selected role`() {
         coEvery { repo.register(any(), any(), any(), any()) } returns AppResult.Success(Unit)
-        val vm = AuthViewModel(repo)
+        val vm = AuthViewModel(repo, null)
         vm.toggleMode()
         vm.update { it.copy(email = "kid@example.test", password = "long enough pass", displayName = "Kid", role = Role.CHILD) }
         vm.submit()
@@ -71,7 +71,7 @@ class AuthViewModelTest {
     @Test
     fun `server errors are shown to the user`() {
         coEvery { repo.login(any(), any()) } returns AppResult.Failure(AppError.Api(401, "INVALID_CREDENTIALS", "Email or password is incorrect."))
-        val vm = AuthViewModel(repo)
+        val vm = AuthViewModel(repo, null)
         vm.update { it.copy(email = "p@example.test", password = "whatever") }
         vm.submit()
         assertEquals("Email or password is incorrect.", vm.form.value.error)
@@ -112,5 +112,63 @@ class AuthAndRoutingUiTest {
     fun `loading auth state shows a progress screen`() {
         compose.setContent { FamilySafetyTheme(dynamicColor = false) { RoleContent(AuthState.Loading, null) } }
         compose.onNodeWithText("Starting…").assertIsDisplayed()
+    }
+}
+
+/** New auth UX: server set-up prompt, password requirement indicator, network errors offer server settings. */
+@RunWith(RobolectricTestRunner::class)
+@Config(application = android.app.Application::class, qualifiers = "w411dp-h891dp")
+class AuthServerUxTest {
+    @get:Rule val compose = createComposeRule()
+
+    @Test
+    fun `missing server shows a setup prompt that opens server settings`() {
+        var opened = false
+        compose.setContent {
+            FamilySafetyTheme(dynamicColor = false) { AuthContent(AuthForm(), {}, {}, {}, serverHost = "api.familysafety.example", serverConfigured = false, onOpenServer = { opened = true }) }
+        }
+        compose.onNodeWithTag("setup_server_card").assertIsDisplayed()
+        compose.onNodeWithText("Set up server").performClick()
+        assertEquals(true, opened)
+    }
+
+    @Test
+    fun `configured server host is shown and no setup prompt`() {
+        compose.setContent {
+            FamilySafetyTheme(dynamicColor = false) { AuthContent(AuthForm(), {}, {}, {}, serverHost = "fs.example.org", serverConfigured = true) }
+        }
+        compose.onNodeWithText("fs.example.org").assertIsDisplayed()
+        compose.onNodeWithTag("setup_server_card").assertDoesNotExist()
+    }
+
+    @Test
+    fun `password requirement reacts to input`() {
+        compose.setContent {
+            FamilySafetyTheme(dynamicColor = false) { AuthContent(AuthForm(registering = true, password = "twelve chars!"), {}, {}, {}) }
+        }
+        compose.onNodeWithText("At least 12 characters ✓").assertExists()
+    }
+
+    @Test
+    fun `network errors offer the server settings`() {
+        compose.setContent {
+            FamilySafetyTheme(dynamicColor = false) {
+                AuthContent(AuthForm(error = "Can't find the server.", errorIsNetwork = true), {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Server settings").assertExists()
+    }
+
+    @Test
+    fun `server settings sheet content shows validation and results`() {
+        compose.setContent {
+            FamilySafetyTheme(dynamicColor = false) {
+                com.familysafety.app.ui.auth.ServerSettingsContent(
+                    com.familysafety.app.ui.auth.ServerSettingsState(input = "https://x.org", check = com.familysafety.app.ui.auth.ConnectionCheck.Failed("The server refused the connection.")),
+                    {}, {}, {}, {},
+                )
+            }
+        }
+        compose.onNodeWithTag("server_error").assertIsDisplayed()
     }
 }

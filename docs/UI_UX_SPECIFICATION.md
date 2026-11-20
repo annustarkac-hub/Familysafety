@@ -27,9 +27,20 @@
 ## Screens
 
 ### Shared
-**Sign in / Register** — email, password (visibility toggle), and on register: name + segmented **Parent | Child**
-selector with a one-line explanation of each role. Inline validation (email format, 12+ char password), server errors
-shown in a live region. Busy state disables the button and shows progress.
+**Sign in / Register** (redesigned in 1.1.0) — soft primary-container gradient backdrop; circular brand badge
+with shield, title and tagline "Safety built on trust and consent"; a **Server** button (top-right, shows the current
+host). Form in an elevated card with **Sign in | Create account** tabs (animated swap). Registration adds the
+**Parent | Child** segmented selector (icons, animated explanation) and name. Fields have leading icons and keyboard
+actions (Next → next field, Done → submit). Live "At least 12 characters" check turns primary with a tick. Errors appear
+in an animated error-container banner; transport errors include a **Server settings** action. A privacy note sits under
+the card. If no real server is configured, a tertiary **Connect to your server first** card is shown above the form.
+
+**Server settings sheet** — address field (URL keyboard, Go = save), helper text (https only in release), **Test
+connection** and **Save** (save only after a successful health check), **Use default**, status line announced via live
+region (checking / connected / specific failure), pointer to SERVER_QUICKSTART.
+
+**Motion** — role switches cross-fade with a slight scale; screens enter with fade + short horizontal slide; usage
+bars animate to their value; status lines cross-fade.
 
 ### Parent
 | Screen | Content | States |

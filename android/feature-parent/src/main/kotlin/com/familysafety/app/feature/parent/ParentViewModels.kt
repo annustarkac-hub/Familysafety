@@ -29,12 +29,15 @@ import com.familysafety.app.domain.repository.SafetyRepository
 import com.familysafety.app.domain.repository.ScreenShareRepository
 import com.familysafety.app.domain.repository.UsageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -46,6 +49,7 @@ import java.time.YearMonth
 import javax.inject.Inject
 
 /** Devices + alerts for the dashboard and device list; refreshes on realtime notices. */
+@OptIn(FlowPreview::class)
 @HiltViewModel
 class ParentHomeViewModel @Inject constructor(
     private val devices: DeviceRepository,
@@ -66,18 +70,20 @@ class ParentHomeViewModel @Inject constructor(
 
     init {
         refresh()
+        // Several children syncing at once would otherwise trigger a refresh per event; coalesce bursts.
         viewModelScope.launch {
-            realtime.events.collect { e ->
-                when (e) {
-                    is RealtimeEvent.PairingCompleted, is RealtimeEvent.DeviceRevoked, is RealtimeEvent.UsageSynced -> refresh()
-                    is RealtimeEvent.Alert -> refreshAlerts()
-                    else -> Unit
-                }
-            }
+            realtime.events
+                .filter { it is RealtimeEvent.PairingCompleted || it is RealtimeEvent.DeviceRevoked || it is RealtimeEvent.UsageSynced }
+                .debounce(750)
+                .collect { refresh() }
+        }
+        viewModelScope.launch {
+            realtime.events.filterIsInstance<RealtimeEvent.Alert>().debounce(300).collect { refreshAlerts() }
         }
     }
 
     fun refresh() = viewModelScope.launch {
+        if (_refreshing.value) return@launch
         _refreshing.value = true
         when (val r = devices.refresh()) {
             is AppResult.Success -> _error.value = null

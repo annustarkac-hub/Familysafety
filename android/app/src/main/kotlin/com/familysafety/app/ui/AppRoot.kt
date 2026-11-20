@@ -2,7 +2,12 @@ package com.familysafety.app.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,16 +37,24 @@ fun AppRoot(deepLink: String?, vm: RootViewModel = hiltViewModel()) {
     RoleContent(state, deepLink)
 }
 
+/** Snapshot of what to render, so an outgoing animated screen never reads the *new* auth state. */
+private data class Route(val destination: Destination, val userId: String?)
+
 @Composable
 fun RoleContent(state: AuthState, deepLink: String?) {
-    when (RoleRouter.destinationFor(state)) {
-        Destination.SPLASH -> LoadingState("Starting…")
-        Destination.AUTH -> AuthScreen()
-        // key() resets each role's navigation graph when the signed-in user changes.
-        Destination.PARENT_HOME -> key((state as AuthState.SignedIn).user.id) { ParentRoot(startOnAlerts = deepLink == Notifier.DEST_ALERTS) }
-        Destination.CHILD_PAIRING -> ChildPairingScreen()
-        Destination.CHILD_HOME -> key((state as AuthState.SignedIn).user.id) {
-            ChildRoot(when (deepLink) {
+    val route = Route(RoleRouter.destinationFor(state), (state as? AuthState.SignedIn)?.user?.id)
+    AnimatedContent(
+        targetState = route,
+        transitionSpec = { (fadeIn(tween(300)) + scaleIn(tween(300), initialScale = 0.98f)) togetherWith fadeOut(tween(200)) },
+        contentKey = { it.destination to it.userId },
+        label = "roleRoute",
+    ) { r ->
+        when (r.destination) {
+            Destination.SPLASH -> LoadingState(message = "Starting…")
+            Destination.AUTH -> AuthScreen()
+            Destination.PARENT_HOME -> ParentRoot(startOnAlerts = deepLink == Notifier.DEST_ALERTS)
+            Destination.CHILD_PAIRING -> ChildPairingScreen()
+            Destination.CHILD_HOME -> ChildRoot(when (deepLink) {
                 Notifier.DEST_SCREEN_SHARE_CONSENT -> ChildRoutes.CONSENT
                 Notifier.DEST_PERMISSIONS -> ChildRoutes.PERMISSIONS
                 Notifier.DEST_ALERTS -> ChildRoutes.SAFETY

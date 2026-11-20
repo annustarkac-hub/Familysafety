@@ -16,8 +16,8 @@ val signingProps = Properties().apply {
 }
 fun signingValue(env: String, prop: String): String? = System.getenv(env) ?: signingProps.getProperty(prop)
 
-val appVersionCode = providers.gradleProperty("familysafety.versionCode").getOrElse("1").toInt()
-val appVersionName = providers.gradleProperty("familysafety.versionName").getOrElse("1.0.0")
+val appVersionCode = providers.gradleProperty("familysafety.versionCode").getOrElse("2").toInt()
+val appVersionName = providers.gradleProperty("familysafety.versionName").getOrElse("1.1.0")
 
 android {
     namespace = "com.familysafety.app"
@@ -57,6 +57,16 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             val release = signingConfigs.getByName("release")
             if (release.storeFile != null) signingConfig = release
+        }
+    }
+
+    // Per-ABI APKs (~1/3 the size, WebRTC native code dominates) plus a universal APK for sideloading.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            isUniversalApk = true
         }
     }
 
@@ -105,6 +115,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.compose.ui.test.junit4)

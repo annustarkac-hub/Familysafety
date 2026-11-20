@@ -9,12 +9,13 @@ Robolectric 4.14.1 (SDK 34 runtime). **No emulator or physical device** was avai
 | Area | Executed | Passed | Failed |
 |---|---|---|---|
 | Backend unit + integration + WebSocket + E2E | 46 | 46 | 0 |
-| Android JVM / Robolectric / Compose UI (debug + release variants of libraries) | 107 | 107 | 0 |
+| Android JVM / Robolectric / Compose UI (debug + release variants of libraries) — 1.1.0 | 142 | 142 | 0 |
 | Android Lint (5 modules) | — | 0 errors | 0 |
 | API smoke test vs Docker Compose stack (`scripts/e2e-smoke.py`) | 10 steps | 10 | 0 |
 | TLS enforcement via Caddy (manual curl) | 2 checks | 2 | 0 |
 | OpenAPI validation (`openapi-spec-validator`) | 1 | 1 | 0 |
-| Physical-device test plan (TESTING.md) | **0** | — | **not run** |
+| Physical device | v1.0.0 installed and launched by the owner; sign-up failed (no server configured) → fixed in 1.1.0 | — | full plan **not run** |
+| 1.1.0: HTTPS enforcement with tunnel-style `X-Forwarded-Proto` (curl vs Docker stack) | 2 checks | 2 | 0 |
 
 Lint warnings remaining: 72 "newer dependency version available" notices (`GradleDependency`,
 `AndroidGradlePluginVersion`) and 1 Compose `ModifierParameter` style warning. No correctness/security warnings.
